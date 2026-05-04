@@ -29,7 +29,7 @@ https://discord.com/channels/368267295601983490/1216428695481487460
 从 GitHub 一行命令下载安装：
 
 ```bash
-pkg install -y curl && curl -L -o install-termux-anki-vnc.sh https://raw.githubusercontent.com/zitons/termux-anki/main/install-termux-anki-vnc.sh && bash install-termux-anki-vnc.sh
+pkg install -y wget && wget -O install-termux-anki-vnc.sh https://raw.githubusercontent.com/zitons/termux-anki/main/install-termux-anki-vnc.sh && bash install-termux-anki-vnc.sh
 ```
 
 把仓库复制到 Termux 后运行：

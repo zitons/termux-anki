@@ -29,7 +29,7 @@ Chinese version: [README.zh-CN.md](README.zh-CN.md)
 One-command install from GitHub:
 
 ```bash
-pkg install -y curl && curl -L -o install-termux-anki-vnc.sh https://raw.githubusercontent.com/zitons/termux-anki/main/install-termux-anki-vnc.sh && bash install-termux-anki-vnc.sh
+pkg install -y wget && wget -O install-termux-anki-vnc.sh https://raw.githubusercontent.com/zitons/termux-anki/main/install-termux-anki-vnc.sh && bash install-termux-anki-vnc.sh
 ```
 
 Copy the repository into Termux, then run:
