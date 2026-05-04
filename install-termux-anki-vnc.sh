@@ -22,23 +22,27 @@ set -Eeuo pipefail
 #   ANKI_PRE=0             Set to 1 to install beta/pre-release aqt
 #   DISTRO=debian          proot-distro name
 #   VNC_DISPLAY=:1         VNC display, :1 means TCP port 5901
-#   VNC_GEOMETRY=540x960   VNC desktop size
+#   VNC_GEOMETRY=anki      anki fits VNC to Anki's window; auto uses Android wm size; or set WxH
+#   VNC_START_GEOMETRY=1280x960 temporary geometry used before Anki appears
 #   VNC_DEPTH=24           VNC color depth
 #   VNC_LOCALHOST=no       no listens on 0.0.0.0; yes listens only on loopback
 #   VNC_PASSWORD=ankianki  VNC password, minimum 6 chars
 #   ANKI_SCALE=1.5         Qt UI scale factor
 #   ANKI_FONT_DPI=144      Qt font DPI
+#   ANKI_WINDOW_SIZE=phone phone uses Android wm size; none disables resizing; or set WxH
 
 DISTRO="${DISTRO:-debian}"
 ANKI_USER="${ANKI_USER:-anki}"
 ANKI_PRE="${ANKI_PRE:-0}"
 VNC_DISPLAY="${VNC_DISPLAY:-:1}"
-VNC_GEOMETRY="${VNC_GEOMETRY:-540x960}"
+VNC_GEOMETRY="${VNC_GEOMETRY:-anki}"
+VNC_START_GEOMETRY="${VNC_START_GEOMETRY:-1280x960}"
 VNC_DEPTH="${VNC_DEPTH:-24}"
 VNC_LOCALHOST="${VNC_LOCALHOST:-no}"
 VNC_PASSWORD="${VNC_PASSWORD:-ankianki}"
 ANKI_SCALE="${ANKI_SCALE:-1.5}"
 ANKI_FONT_DPI="${ANKI_FONT_DPI:-144}"
+ANKI_WINDOW_SIZE="${ANKI_WINDOW_SIZE:-phone}"
 MODE="install"
 
 for arg in "$@"; do
@@ -138,7 +142,7 @@ pkg_installed() {
 missing=0
 
 printf '\n== Step 3/6: Debian runtime and VNC packages ==\n'
-for pkg in ca-certificates dbus-x11 fonts-noto-cjk libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libnss3 locales openbox python3 python3-pip python3-pyqt6.qtmultimedia python3-pyqt6.qtquick python3-pyqt6.qtwebengine python3-venv sudo tigervnc-standalone-server xauth xterm; do
+for pkg in ca-certificates dbus-x11 fonts-noto-cjk libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libnss3 locales openbox python3 python3-pip python3-pyqt6.qtmultimedia python3-pyqt6.qtquick python3-pyqt6.qtwebengine python3-venv sudo tigervnc-standalone-server x11-xserver-utils xauth xdotool xterm; do
   if pkg_installed "$pkg"; then
     status ok "Debian package installed: $pkg"
   else
@@ -335,7 +339,9 @@ install_missing_packages \
   python3-venv \
   sudo \
   tigervnc-standalone-server \
+  x11-xserver-utils \
   xauth \
+  xdotool \
   xterm
 
 if pkg_installed libpci3; then
@@ -412,9 +418,46 @@ export QTWEBENGINE_CHROMIUM_FLAGS="--disable-seccomp-filter-sandbox --disable-gp
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/runtime-$USER}"
 mkdir -p "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
+if [[ -r "$HOME/.config/tigervnc/anki-session-env" ]]; then
+  . "$HOME/.config/tigervnc/anki-session-env"
+fi
 openbox-session >/tmp/openbox-session.log 2>&1 &
 sleep 1
 "$HOME/.local/bin/anki-vnc" >/tmp/anki-vnc.log 2>&1 &
+if [[ "${VNC_FIT_TO_ANKI:-0}" == "1" || -n "${ANKI_TARGET_GEOMETRY:-}" ]]; then
+  : > /tmp/anki-window-resize.log
+  echo "target=${ANKI_TARGET_GEOMETRY:-}, fit=${VNC_FIT_TO_ANKI:-0}" >> /tmp/anki-window-resize.log
+  for _ in $(seq 1 80); do
+    anki_window="$(xdotool search --onlyvisible --class anki 2>/dev/null | tail -n 1 || true)"
+    if [[ -z "$anki_window" ]]; then
+      anki_window="$(xdotool search --onlyvisible --class Anki 2>/dev/null | tail -n 1 || true)"
+    fi
+    if [[ -z "$anki_window" ]]; then
+      anki_window="$(xdotool search --onlyvisible --name Anki 2>/dev/null | tail -n 1 || true)"
+    fi
+    if [[ -n "$anki_window" ]]; then
+      echo "window=$anki_window" >> /tmp/anki-window-resize.log
+      if [[ "${ANKI_TARGET_GEOMETRY:-}" =~ ^([0-9]+)x([0-9]+)$ ]]; then
+        target_w="${BASH_REMATCH[1]}"
+        target_h="${BASH_REMATCH[2]}"
+        xrandr --fb "${target_w}x${target_h}" >/tmp/vnc-xrandr.log 2>&1 || true
+        xdotool windowactivate "$anki_window" >/tmp/anki-window-activate.log 2>&1 || true
+        xdotool windowsize "$anki_window" "$target_w" "$target_h" >/tmp/anki-window-size.log 2>&1 || true
+        xdotool windowmove "$anki_window" 0 0 >/tmp/anki-window-move.log 2>&1 || true
+        eval "$(xdotool getwindowgeometry --shell "$anki_window" 2>/dev/null || true)"
+        echo "requested=${target_w}x${target_h} actual=${WIDTH:-?}x${HEIGHT:-?}" >> /tmp/anki-window-resize.log
+        break
+      fi
+      eval "$(xdotool getwindowgeometry --shell "$anki_window" 2>/dev/null || true)"
+      if [[ "${WIDTH:-0}" -gt 0 && "${HEIGHT:-0}" -gt 0 ]]; then
+        xrandr --fb "${WIDTH}x${HEIGHT}" >/tmp/vnc-xrandr.log 2>&1 || true
+        echo "fit=${WIDTH}x${HEIGHT}" >> /tmp/anki-window-resize.log
+        break
+      fi
+    fi
+    sleep 0.25
+  done
+fi
 wait
 VNC_XSTARTUP
   chmod +x "$HOME/.config/tigervnc/xstartup"
@@ -439,12 +482,44 @@ DISTRO="${DISTRO}"
 ANKI_USER="${ANKI_USER}"
 VNC_DISPLAY="\${VNC_DISPLAY:-${VNC_DISPLAY}}"
 VNC_GEOMETRY="\${VNC_GEOMETRY:-${VNC_GEOMETRY}}"
+VNC_START_GEOMETRY="\${VNC_START_GEOMETRY:-${VNC_START_GEOMETRY}}"
 VNC_DEPTH="\${VNC_DEPTH:-${VNC_DEPTH}}"
 VNC_LOCALHOST="\${VNC_LOCALHOST:-${VNC_LOCALHOST}}"
 ANKI_SCALE="\${ANKI_SCALE:-${ANKI_SCALE}}"
 ANKI_FONT_DPI="\${ANKI_FONT_DPI:-${ANKI_FONT_DPI}}"
+ANKI_WINDOW_SIZE="\${ANKI_WINDOW_SIZE:-${ANKI_WINDOW_SIZE}}"
 
 vnc_port=\$((5900 + \${VNC_DISPLAY#:}))
+PHONE_GEOMETRY=""
+if command -v wm >/dev/null 2>&1; then
+  PHONE_GEOMETRY="\$(wm size 2>/dev/null | grep -Eo '[0-9]+x[0-9]+' | tail -n 1 || true)"
+fi
+ANKI_TARGET_GEOMETRY=""
+if [[ "\$ANKI_WINDOW_SIZE" == "phone" ]]; then
+  if [[ "\$PHONE_GEOMETRY" =~ ^[0-9]+x[0-9]+$ ]]; then
+    ANKI_TARGET_GEOMETRY="\$PHONE_GEOMETRY"
+  else
+    ANKI_TARGET_GEOMETRY="600x1200"
+  fi
+elif [[ "\$ANKI_WINDOW_SIZE" != "none" && "\$ANKI_WINDOW_SIZE" =~ ^[0-9]+x[0-9]+$ ]]; then
+  ANKI_TARGET_GEOMETRY="\$ANKI_WINDOW_SIZE"
+fi
+
+VNC_FIT_TO_ANKI=0
+if [[ "\$VNC_GEOMETRY" == "anki" ]]; then
+  if [[ -n "\$ANKI_TARGET_GEOMETRY" ]]; then
+    VNC_GEOMETRY="\$ANKI_TARGET_GEOMETRY"
+  else
+    VNC_FIT_TO_ANKI=1
+    VNC_GEOMETRY="\$VNC_START_GEOMETRY"
+  fi
+elif [[ "\$VNC_GEOMETRY" == "auto" ]]; then
+  if [[ "\$PHONE_GEOMETRY" =~ ^[0-9]+x[0-9]+$ ]]; then
+    VNC_GEOMETRY="\$PHONE_GEOMETRY"
+  else
+    VNC_GEOMETRY="600x1200"
+  fi
+fi
 
 pulseaudio --start \\
   --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" \\
@@ -456,6 +531,8 @@ exec proot-distro login "\$DISTRO" --user "\$ANKI_USER" --shared-tmp -- \\
       VNC_GEOMETRY="\$VNC_GEOMETRY" \\
       VNC_DEPTH="\$VNC_DEPTH" \\
       VNC_LOCALHOST="\$VNC_LOCALHOST" \\
+      VNC_FIT_TO_ANKI="\$VNC_FIT_TO_ANKI" \\
+      ANKI_TARGET_GEOMETRY="\$ANKI_TARGET_GEOMETRY" \\
       QT_SCALE_FACTOR="\$ANKI_SCALE" \\
       QT_FONT_DPI="\$ANKI_FONT_DPI" \\
       bash -lc '
@@ -467,7 +544,17 @@ exec proot-distro login "\$DISTRO" --user "\$ANKI_USER" --shared-tmp -- \\
         fi
         port=\$((5900 + \${VNC_DISPLAY#:}))
         echo "Connect AVNC/bVNC to 127.0.0.1:\$port"
-        echo "Geometry: \$VNC_GEOMETRY, Qt scale: \${QT_SCALE_FACTOR:-unset}, Qt font DPI: \${QT_FONT_DPI:-unset}"
+        echo "Geometry: \$VNC_GEOMETRY, Anki window: \${ANKI_TARGET_GEOMETRY:-default}, Qt scale: \${QT_SCALE_FACTOR:-unset}, Qt font DPI: \${QT_FONT_DPI:-unset}"
+        if [[ "\${VNC_FIT_TO_ANKI:-0}" == "1" ]]; then
+          echo "VNC will resize to Anki window after Anki appears."
+        fi
+        mkdir -p "\$HOME/.config/tigervnc"
+        {
+          printf "VNC_FIT_TO_ANKI=%q\n" "\${VNC_FIT_TO_ANKI:-0}"
+          printf "ANKI_TARGET_GEOMETRY=%q\n" "\${ANKI_TARGET_GEOMETRY:-}"
+          printf "QT_SCALE_FACTOR=%q\n" "\${QT_SCALE_FACTOR:-}"
+          printf "QT_FONT_DPI=%q\n" "\${QT_FONT_DPI:-}"
+        } > "\$HOME/.config/tigervnc/anki-session-env"
         echo "If 127.0.0.1 fails, try localhost:\$port"
         if vncserver -list 2>/dev/null | awk "{print \\\$1}" | grep -qx "\$VNC_DISPLAY"; then
           vncserver -kill "\$VNC_DISPLAY" >/dev/null 2>&1 || true
