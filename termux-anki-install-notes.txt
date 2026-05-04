@@ -1,0 +1,21 @@
+I made a quick write up. If anyone attempts this lmk if there's anything major missing:
+
+Requires a devices with an ARM64 CPU and a few GB of storage available. This is a general guide and there may be missing steps. Additional configurable needed (e.g. the vnc server) which are covered in other tutorials. A lot of this can be scripted, but unfortunately I don't have time to maintain such a script.
+
+1. Install Termux and update packages: `pkg upgrade`
+2. Install Termux's proot-distro package using the command `pkg install proot-distro`
+3. Install Debian in a PRoot environment: `proot-distro install debian`. Others distros are available but may not have as stable of packages or use different package managers. If you're conserving mobile data, you might wish to switch to wifi as this could be a large download
+4. Login to the Debian PRoot as the root user: `proot-distro login debian`.
+4.1 update packages:
+`apt update && apt upgrade`
+5. Install a vnc server amd your choice of desktop environment. I like XFCE: `apt install tigervnc-standalone-server xfce4`
+6. Create a non-root user to run anki: `adduser myuser`
+7. Switch to that user `su myuser`
+8. Configure the vncserver to run on localhost, port 5901, your chosen desktop environment, and run the vncserver.
+9. Install Anki via the Linux (ARM) instructions at https://betas.ankiweb.net/ . Note: Using the `--pre` option means installing the beta version. Not using `--pre` means the stable version.
+10. Open a vncclient app and connect to localhost on port 5901. I like AVNC in the "touchpad gesture" mode as Anki menus are too small for me to touch.
+
+Bugs:
+If you see blank windows, add this to bashrc or a wrapper script: export QTWEBENGINE_DISABLE_SANDBOX=1
+
+When I installed Anki there was a package that caused segmentations faults. Details and solution here: https://forums.ankiweb.net/t/found-the-cause-of-my-segmentation-fault-on-debian-12-arm64-installed-in-proot-termux/37665
