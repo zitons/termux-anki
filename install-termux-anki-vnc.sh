@@ -142,7 +142,7 @@ pkg_installed() {
 missing=0
 
 printf '\n== Step 3/6: Debian runtime and VNC packages ==\n'
-for pkg in ca-certificates dbus-x11 fonts-noto-cjk libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libnss3 locales openbox python3 python3-pip python3-pyqt6.qtmultimedia python3-pyqt6.qtquick python3-pyqt6.qtwebengine python3-venv sudo tigervnc-standalone-server x11-xserver-utils xauth xdotool xterm; do
+for pkg in ca-certificates dbus-x11 fonts-noto-cjk libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libnss3 locales mpv openbox python3 python3-pip python3-pyqt6.qtmultimedia python3-pyqt6.qtquick python3-pyqt6.qtwebengine python3-venv sudo tigervnc-standalone-server x11-xserver-utils xauth xdotool xterm; do
   if pkg_installed "$pkg"; then
     status ok "Debian package installed: $pkg"
   else
@@ -318,7 +318,6 @@ install_missing_packages \
   ca-certificates \
   dbus-x11 \
   fonts-noto-cjk \
-  mpv \
   libxcb-cursor0 \
   libxcb-icccm4 \
   libxcb-image0 \
@@ -331,6 +330,7 @@ install_missing_packages \
   libxkbcommon-x11-0 \
   libnss3 \
   locales \
+  mpv \
   openbox \
   python3 \
   python3-pip \
