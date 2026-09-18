@@ -318,6 +318,7 @@ install_missing_packages \
   ca-certificates \
   dbus-x11 \
   fonts-noto-cjk \
+  mpv \
   libxcb-cursor0 \
   libxcb-icccm4 \
   libxcb-image0 \
